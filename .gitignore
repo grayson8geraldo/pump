@@ -1,0 +1,10 @@
+.env
+*.session
+*.session-journal
+__pycache__/
+*.pyc
+trades.db
+trades.log
+*.db-journal
+.venv/
+venv/
