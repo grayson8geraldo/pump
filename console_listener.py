@@ -98,6 +98,12 @@ class ConsoleListener:
                 except Exception:
                     logger.exception("Error processing signal for %s", signal.ticker)
 
+                print()
+                print("-" * 50)
+                print("  Ready for next signal...")
+                print("-" * 50)
+                print()
+
             except EOFError:
                 self._running = False
                 return

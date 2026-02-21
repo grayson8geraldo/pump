@@ -139,7 +139,7 @@ class TradingBot:
         # ── 2. Check if symbol exists on Bybit ──
         await self._exchange._ensure_markets()
         if not self._exchange.has_symbol(ticker):
-            logger.debug("Symbol %s not on Bybit, skipping", ticker)
+            logger.info("⛔ %s not found on Bybit — skipping", ticker)
             await self._log_signal(signal, "NOT_ON_EXCHANGE")
             return
 
