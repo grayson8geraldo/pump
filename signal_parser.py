@@ -57,6 +57,17 @@ _EXCHANGE_TAGS = re.compile(
 # Known exchange names that may appear without hashtag
 _EXCHANGE_NAMES = {"bybit", "binance", "okx", "mexc", "bitget", "bingx", "gate"}
 
+# Unicode small caps → ASCII mapping (used in screener channels)
+_SMALL_CAPS = str.maketrans(
+    "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀꜱᴛᴜᴠᴡxʏᴢ",
+    "abcdefghijklmnopqrstuvwxyz",
+)
+
+
+def _normalize_small_caps(text: str) -> str:
+    """Convert Unicode small caps letters to regular ASCII lowercase."""
+    return text.translate(_SMALL_CAPS)
+
 # Words that are clearly NOT tickers
 _NOT_TICKER = {
     "USDT", "BTC", "ETH", "USD", "ROI", "PUMP", "DUMP", "SCREENER",
@@ -126,9 +137,10 @@ def parse_signal(text: str) -> Optional[Signal]:
     # Extract exchanges
     exchanges = [m.group(1).capitalize() for m in _EXCHANGE_TAGS.finditer(text)]
     if not exchanges:
-        # Try plain text mentions
+        # Try plain text mentions (including Unicode small caps)
+        normalized = _normalize_small_caps(text.lower())
         for name in _EXCHANGE_NAMES:
-            if name in text.lower():
+            if name in normalized:
                 exchanges.append(name.capitalize())
 
     # Extract bell count

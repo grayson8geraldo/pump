@@ -30,7 +30,7 @@ from analyzer import analyze_signal, Strategy
 from risk_manager import RiskManager
 from position_manager import PositionManager
 from trade_logger import TradeLogger
-from telegram_listener import TelegramListener
+from console_listener import ConsoleListener
 
 # ── Logging setup ──
 logging.basicConfig(
@@ -75,7 +75,7 @@ class TradingBot:
                      cfg.leverage, cfg.margin_pct, cfg.sl_price_pct, cfg.tp_price_pct)
         logger.info("Averaging: %s", "ON" if cfg.use_averaging else "OFF")
         logger.info("Testnet: %s", config.BYBIT_TESTNET)
-        logger.info("Channels: %s", ", ".join(config.SIGNAL_CHANNELS))
+        logger.info("Mode: CONSOLE (manual signal input)")
         logger.info("=" * 60)
 
         # Start position monitor in background
@@ -83,9 +83,9 @@ class TradingBot:
             self._positions.start_monitoring(self._exchange.get_total_equity)
         )
 
-        # Start Telegram listener
+        # Start console listener (manual signal input)
         self._running = True
-        listener = TelegramListener(on_signal=self._handle_signal)
+        listener = ConsoleListener(on_signal=self._handle_signal)
 
         try:
             await listener.start()
@@ -94,7 +94,7 @@ class TradingBot:
         finally:
             await self._shutdown(listener)
 
-    async def _shutdown(self, listener: TelegramListener):
+    async def _shutdown(self, listener: ConsoleListener):
         """Graceful shutdown."""
         self._running = False
         await listener.stop()
