@@ -24,7 +24,6 @@ from collections import deque
 
 import config
 from config import get_config, get_phase_for_balance
-from exchange import Exchange
 from signal_parser import Signal, SignalDirection, is_spam_wave
 from analyzer import analyze_signal, Strategy
 from risk_manager import RiskManager
@@ -48,7 +47,12 @@ class TradingBot:
     """Main bot orchestrator."""
 
     def __init__(self):
-        self._exchange = Exchange()
+        if config.DRY_RUN:
+            from dry_exchange import DryRunExchange
+            self._exchange = DryRunExchange(initial_balance=config.DRY_RUN_BALANCE)
+        else:
+            from exchange import Exchange
+            self._exchange = Exchange()
         self._risk = RiskManager()
         self._positions = PositionManager(self._exchange, self._risk)
         self._trade_logger = TradeLogger()
@@ -74,8 +78,11 @@ class TradingBot:
         logger.info("Leverage: %dx | Margin: %.1f%% | SL: %.1f%% | TP: %.1f%%",
                      cfg.leverage, cfg.margin_pct, cfg.sl_price_pct, cfg.tp_price_pct)
         logger.info("Averaging: %s", "ON" if cfg.use_averaging else "OFF")
-        logger.info("Testnet: %s", config.BYBIT_TESTNET)
-        logger.info("Mode: CONSOLE (manual signal input)")
+        if config.DRY_RUN:
+            logger.info("Mode: DRY-RUN (paper trading, $%.2f virtual)", config.DRY_RUN_BALANCE)
+        else:
+            logger.info("Testnet: %s", config.BYBIT_TESTNET)
+        logger.info("Input: CONSOLE (manual signal input)")
         logger.info("=" * 60)
 
         # Start position monitor in background

@@ -134,6 +134,10 @@ BYBIT_API_KEY = os.getenv("BYBIT_API_KEY", "")
 BYBIT_API_SECRET = os.getenv("BYBIT_API_SECRET", "")
 BYBIT_TESTNET = os.getenv("BYBIT_TESTNET", "true").lower() == "true"
 
+# ── Dry-run (paper trading) ──
+DRY_RUN = os.getenv("DRY_RUN", "false").lower() == "true"
+DRY_RUN_BALANCE = float(os.getenv("DRY_RUN_BALANCE", "100.0"))
+
 # ── General settings ──
 # Minimum seconds between processing signals for the same coin
 SIGNAL_COOLDOWN_SEC = int(os.getenv("SIGNAL_COOLDOWN_SEC", "60"))
