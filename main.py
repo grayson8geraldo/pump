@@ -216,14 +216,36 @@ class TradingBot:
             await self._log_signal(signal, f"LOW_QUALITY ({analysis.quality})")
             return
 
-        # ── 10. Skip if continuation detected but no strong confirmation ──
+        # ── 10. Continuation fallback to Reverse ──
         if analysis.strategy == Strategy.CONTINUATION and analysis.quality < 3:
             logger.info(
-                "Continuation signal for %s but quality=%d, skipping (need ≥3)",
+                "Continuation for %s quality=%d < 3, falling back to REVERSE",
                 ticker, analysis.quality,
             )
-            await self._log_signal(signal, "CONTINUATION_LOW_QUALITY")
-            return
+            # Re-analyze as REVERSE — short the pump / long the dump
+            analysis = analyze_signal(
+                signal=signal,
+                df_1m=df_1m,
+                df_1h=df_1h,
+                current_price=current_price,
+                sl_pct=cfg.sl_price_pct,
+                tp_pct=cfg.tp_price_pct,
+                force_strategy=Strategy.REVERSE,
+            )
+            logger.info(
+                "Fallback analysis for %s: strategy=%s, quality=%d/5, side=%s",
+                ticker, analysis.strategy.value, analysis.quality, analysis.trade_side,
+            )
+            for r in analysis.reasons:
+                logger.info("  • %s", r)
+            # Apply quality filter again
+            if analysis.quality < config.MIN_SETUP_QUALITY:
+                logger.info(
+                    "Reverse fallback quality too low for %s (%d < %d), skipping",
+                    ticker, analysis.quality, config.MIN_SETUP_QUALITY,
+                )
+                await self._log_signal(signal, "REVERSE_FALLBACK_LOW_QUALITY")
+                return
 
         # ── 11. Execute trade ──
         logger.info(

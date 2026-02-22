@@ -59,6 +59,7 @@ def analyze_signal(
     current_price: float,
     sl_pct: float = 3.0,
     tp_pct: float = 3.0,
+    force_strategy: Strategy | None = None,
 ) -> Analysis:
     """
     Analyze a signal against chart data and return trading parameters.
@@ -166,7 +167,10 @@ def analyze_signal(
     if signal.is_dump and trend == "down":
         continuation_score += 1
 
-    if continuation_score >= 3:
+    if force_strategy is not None:
+        strategy = force_strategy
+        reasons.append(f"→ {strategy.value.upper()} strategy (forced)")
+    elif continuation_score >= 3:
         strategy = Strategy.CONTINUATION
         reasons.append(f"→ CONTINUATION strategy (score={continuation_score})")
     else:
