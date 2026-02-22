@@ -79,10 +79,16 @@ def analyze_signal(
         rsi_confirms = True
         quality += 1
         reasons.append(f"RSI overbought ({rsi_val:.1f})")
+        if rsi_val >= 90:
+            quality += 1
+            reasons.append(f"RSI extreme overbought ({rsi_val:.1f})")
     elif signal.is_dump and is_oversold(rsi_val):
         rsi_confirms = True
         quality += 1
         reasons.append(f"RSI oversold ({rsi_val:.1f})")
+        if rsi_val <= 10:
+            quality += 1
+            reasons.append(f"RSI extreme oversold ({rsi_val:.1f})")
 
     # ── 2. Pivot Points ──
     pivots = compute_pivot_points(df_1h)
@@ -132,7 +138,10 @@ def analyze_signal(
 
     # ── 6. Volume spike ──
     vol_spike = compute_volume_spike(df_1m)
-    if vol_spike >= 3.0:
+    if vol_spike >= 10.0:
+        quality += 1
+        reasons.append(f"Volume spike {vol_spike:.1f}x (+quality)")
+    elif vol_spike >= 3.0:
         reasons.append(f"Volume spike {vol_spike:.1f}x")
 
     # ── 7. Signal volatility ──
