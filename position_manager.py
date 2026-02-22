@@ -122,13 +122,17 @@ class PositionManager:
                 close_side = "buy" if analysis.trade_side == "sell" else "sell"
 
                 if use_avg:
-                    # For averaging: use ROI-based TP
+                    # For averaging: use ROI-based TP and proportional SL
                     roi_tp = cfg.avg_tp_roi_pct / 100
+                    roi_sl = roi_tp * 1.5  # SL = 1.5x TP (18% ROI vs 12% ROI)
                     if analysis.trade_side == "sell":
                         tp_price = fill_price * (1 - roi_tp / leverage)
+                        sl_price = fill_price * (1 + roi_sl / leverage)
                     else:
                         tp_price = fill_price * (1 + roi_tp / leverage)
+                        sl_price = fill_price * (1 - roi_sl / leverage)
                     pos.tp_price = tp_price
+                    pos.sl_price = sl_price
 
                 await self._exchange.place_limit_tp(
                     ticker, close_side, ex_pos["size"], tp_price
