@@ -110,11 +110,15 @@ class DryRunExchange:
             return None
         try:
             price = await self.fetch_ticker_price(ticker)
-            upnl = self._calc_unrealized_pnl(pos, price)
         except Exception:
-            upnl = 0.0
             price = pos["entry_price"]
 
+        # Check if TP or SL was hit
+        filled = await self._check_tp_sl(ticker, price)
+        if filled:
+            return None  # Position was closed by TP/SL
+
+        upnl = self._calc_unrealized_pnl(pos, price)
         return {
             "side": pos["side"],
             "size": pos["size"],
@@ -123,6 +127,64 @@ class DryRunExchange:
             "leverage": pos["leverage"],
             "notional": pos["size"] * price,
         }
+
+    async def _check_tp_sl(self, ticker: str, current_price: float) -> bool:
+        """Check if any TP/SL orders for this ticker should be filled."""
+        pos = self._positions.get(ticker)
+        if not pos:
+            return False
+
+        triggered_order = None
+        for order in self._orders:
+            if order.get("ticker") != ticker:
+                continue
+            if order["type"] == "tp":
+                # TP: for long, price must go UP to TP; for short, DOWN to TP
+                if pos["side"] == "long" and current_price >= order["price"]:
+                    triggered_order = order
+                    break
+                elif pos["side"] == "short" and current_price <= order["price"]:
+                    triggered_order = order
+                    break
+            elif order["type"] == "sl":
+                # SL: for long, price must DROP to SL; for short, UP to SL
+                if pos["side"] == "long" and current_price <= order["price"]:
+                    triggered_order = order
+                    break
+                elif pos["side"] == "short" and current_price >= order["price"]:
+                    triggered_order = order
+                    break
+
+        if not triggered_order:
+            return False
+
+        # Execute the fill
+        fill_price = triggered_order["price"]
+        pnl = self._calc_unrealized_pnl(pos, fill_price)
+        reason = "TP" if triggered_order["type"] == "tp" else "SL"
+
+        self._balance += pos["margin"] + pnl
+        self._pnl += pnl
+        self._trade_history.append({
+            "ticker": ticker,
+            "side": pos["side"],
+            "entry": pos["entry_price"],
+            "exit": fill_price,
+            "pnl": pnl,
+            "closed_at": time.time(),
+            "reason": reason,
+        })
+
+        # Clean up
+        self._orders = [o for o in self._orders if o.get("ticker") != ticker]
+        del self._positions[ticker]
+
+        emoji = "🟩" if pnl >= 0 else "🟥"
+        logger.info(
+            "%s [DRY] %s hit for %s: entry=%.4f, exit=%.4f, P&L=$%.4f",
+            emoji, reason, ticker, pos["entry_price"], fill_price, pnl,
+        )
+        return True
 
     async def get_all_positions(self) -> list[dict]:
         result = []
