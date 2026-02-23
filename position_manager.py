@@ -31,6 +31,7 @@ class ManagedPosition:
     opened_at: float = 0.0
     quality: int = 1
     analysis_reasons: list[str] = field(default_factory=list)
+    sl_at_breakeven: bool = False
 
 
 class PositionManager:
@@ -198,6 +199,15 @@ class PositionManager:
                 entry_num, pos.ticker,
             )
 
+    def _get_last_trade_pnl(self, ticker: str) -> float:
+        """Try to get P&L from exchange trade history (dry-run support)."""
+        history = getattr(self._exchange, '_trade_history', None)
+        if history:
+            for trade in reversed(history):
+                if trade.get("ticker") == ticker:
+                    return trade.get("pnl", 0.0)
+        return 0.0
+
     async def close_trade(self, ticker: str, reason: str = "") -> float:
         """
         Close a position and return the realized P&L.
@@ -242,8 +252,14 @@ class PositionManager:
                 if not ex_pos:
                     # Position was closed externally (TP/SL hit)
                     logger.info("Position %s closed externally", ticker)
-                    self._risk.record_trade(ticker, 0.0)  # P&L unknown
-                    tickers_to_close.append(ticker)
+                    # Try to get real P&L from exchange trade history
+                    pnl = self._get_last_trade_pnl(ticker)
+                    self._risk.record_trade(ticker, pnl)
+                    del self._positions[ticker]
+                    logger.info(
+                        "❎ Closed %s: P&L=$%.2f (TP/SL hit)",
+                        ticker, pnl,
+                    )
                     continue
 
                 unrealized = ex_pos["unrealized_pnl"]
@@ -275,30 +291,31 @@ class PositionManager:
                             if price <= trigger:
                                 await self._place_averaging_order(pos, balance, expected_entries)
 
-                # Move SL to breakeven if in profit
-                roi = unrealized / pos.margin_used * 100 if pos.margin_used else 0
-                if roi >= 10:  # 10% ROI
-                    # Move SL to entry
-                    close_side = "buy" if pos.side == "sell" else "sell"
-                    try:
-                        await self._exchange.cancel_all_orders(ticker)
-                        await self._exchange.place_stop_market(
-                            ticker, close_side, ex_pos["size"], pos.entry_price
-                        )
-                        await self._exchange.place_limit_tp(
-                            ticker, close_side, ex_pos["size"], pos.tp_price
-                        )
-                        logger.info("Moved SL to breakeven for %s", ticker)
-                    except Exception:
-                        logger.debug("Could not move SL for %s", ticker)
+                # Move SL to breakeven if in profit (only once)
+                if not pos.sl_at_breakeven:
+                    roi = unrealized / pos.margin_used * 100 if pos.margin_used else 0
+                    if roi >= 10:  # 10% ROI
+                        close_side = "buy" if pos.side == "sell" else "sell"
+                        try:
+                            await self._exchange.cancel_all_orders(ticker)
+                            await self._exchange.place_stop_market(
+                                ticker, close_side, ex_pos["size"], pos.entry_price
+                            )
+                            await self._exchange.place_limit_tp(
+                                ticker, close_side, ex_pos["size"], pos.tp_price
+                            )
+                            pos.sl_at_breakeven = True
+                            logger.info("Moved SL to breakeven for %s", ticker)
+                        except Exception:
+                            logger.debug("Could not move SL for %s", ticker)
 
             except Exception:
                 logger.exception("Error monitoring %s", ticker)
 
-        # Close positions that need closing
+        # Close positions that need force-closing (max stop)
         for ticker in tickers_to_close:
             if ticker in self._positions:
-                await self.close_trade(ticker, reason="max stop / external close")
+                await self.close_trade(ticker, reason="max stop")
 
     async def start_monitoring(self, get_balance):
         """Background task to periodically check positions."""
