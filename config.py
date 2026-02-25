@@ -44,17 +44,17 @@ PHASE_1_CONFIG = PhaseConfig(
     start_balance=100.0,
     target_balance=1000.0,
     leverage=10,
-    margin_pct=5.0,
+    margin_pct=10.0,
     max_stop_pct=5.0,
-    daily_stop_pct=10.0,
-    tp_price_pct=3.0,
+    daily_stop_pct=15.0,
+    tp_price_pct=4.0,
     sl_price_pct=3.0,
-    max_concurrent_trades=2,
+    max_concurrent_trades=3,
     use_averaging=True,
-    avg_margin_pct=1.25,
+    avg_margin_pct=2.5,
     avg_max_entries=5,
     avg_step_pct=4.0,
-    avg_tp_roi_pct=12.0,
+    avg_tp_roi_pct=15.0,
 )
 
 # Phase 2: Steady growth $1,000 → $10,000
